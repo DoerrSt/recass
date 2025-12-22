@@ -1,0 +1,6 @@
+# Ignoriert alle Verzeichnisse, die mit 'meeting-' beginnen.
+meeting-*/
+chromadb/*
+*pycache*/
+chats.db
+.venv/

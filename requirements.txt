@@ -1,0 +1,34 @@
+# Requirements for recass.py
+
+# Core audio processing and ML libraries
+openai-whisper # Or whisper-timestamped, depending on preference for original or timestamped fork
+sounddevice
+numpy
+torch
+torchaudio
+
+# Speaker diarization
+pyannote.audio
+
+# GUI and system tray icon
+Pillow # For PIL (Python Imaging Library)
+pystray
+PyGObject # For gi, Gtk, and GLib on Linux systems with Gtk/AppIndicator
+
+# Ollama API integration
+requests
+
+# File content extraction for chat uploads
+beautifulsoup4
+python-docx
+openpyxl
+PyPDF2 # Added for PDF file processing
+
+# Optional: local vector DB for storing meeting analyses (used when AI: Record meeting enabled)
+# Install this to enable Chroma persistence: `pip install chromadb`
+chromadb>=0.4.0
+
+# Note: For PyGObject, you might need to install system-level packages first.
+# On Debian/Ubuntu: sudo apt install python3-gi libgirepository1.0-dev
+# On Arch Linux: sudo pacman -S python-gobject
+# On Fedora: sudo dnf install python3-gobject
