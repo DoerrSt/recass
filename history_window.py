@@ -79,18 +79,22 @@ class HistoryWindow(Gtk.Window):
     def append_text(self, text):
         end_iter = self.textbuffer.get_end_iter()
         self.textbuffer.insert(end_iter, text + '\n')
-        # auto-scroll
-        adj = self.textview.get_parent().get_vadjustment()
-        if adj:
-            adj.set_value(adj.get_upper() - adj.get_page_size())
+        # auto-scroll, only if the widget is realized
+        parent = self.textview.get_parent()
+        if parent:
+            adj = parent.get_vadjustment()
+            if adj:
+                adj.set_value(adj.get_upper() - adj.get_page_size())
 
     def set_full_history(self, history_list):
         full_text = '\n'.join(history_list)
         self.textbuffer.set_text(full_text)
-        # auto-scroll
-        adj = self.textview.get_parent().get_vadjustment()
-        if adj:
-            adj.set_value(adj.get_upper() - adj.get_page_size())
+        # auto-scroll, only if the widget is realized
+        parent = self.textview.get_parent()
+        if parent:
+            adj = parent.get_vadjustment()
+            if adj:
+                adj.set_value(adj.get_upper() - adj.get_page_size())
 
     def clear(self):
         self.textbuffer.set_text("")
