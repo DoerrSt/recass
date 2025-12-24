@@ -2,6 +2,7 @@
 """UI application and device management for recass."""
 
 import os
+import shutil
 import threading
 import queue
 import time
@@ -72,6 +73,8 @@ class Application:
         self.consistency_check_thread = None
         self.consistency_check_stop_event = threading.Event()
         self.consistency_check_enabled = False
+        self.delete_after_days = 0 # New attribute for retention policy
+        self.retention_policy_stop_event = threading.Event()
         
         # Device IDs
         self.mic_dev_id = None
@@ -169,6 +172,9 @@ class Application:
         # Device names
         self.audio_device_manager.mic_dev_name = settings.get('mic_dev_name')
         self.audio_device_manager.loopback_dev_name = settings.get('loopback_dev_name')
+
+        # Retention policy
+        self.delete_after_days = int(settings.get('delete_after_days', 0))
 
     def _load_diarization_pipeline(self):
         """Load the speaker diarization pipeline if HF token is available."""
@@ -427,8 +433,11 @@ class Application:
         # Timer settings
         self._create_timer_ui(grid, 15)
         
+        # Retention policy settings
+        self._create_retention_ui(grid, 16)
+        
         # Action Buttons
-        self._create_action_buttons(grid, 16)
+        self._create_action_buttons(grid, 17)
         
         self._window.show_all()
     
@@ -748,6 +757,23 @@ class Application:
         
         grid.attach(l_timer, 0, row, 1, 1)
         grid.attach(timer_box, 1, row, 2, 1)
+
+    def _create_retention_ui(self, grid, row):
+        """Create retention policy UI."""
+        l_retention = Gtk.Label(label="Delete meetings older than (days):")
+        l_retention.set_xalign(0)
+        adj = Gtk.Adjustment(value=self.delete_after_days, lower=0, upper=365, step_increment=1)
+        self.retention_spin = Gtk.SpinButton(adjustment=adj)
+        self.retention_spin.connect("value-changed", self._on_retention_days_changed)
+
+        retention_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        retention_box.pack_start(self.retention_spin, True, True, 0)
+        
+        info_label = Gtk.Label(label="(0 = disabled)")
+        retention_box.pack_start(info_label, False, False, 5)
+
+        grid.attach(l_retention, 0, row, 1, 1)
+        grid.attach(retention_box, 1, row, 2, 1)
     
     def _create_action_buttons(self, grid, row):
         """Create action buttons."""
@@ -818,8 +844,61 @@ class Application:
         thread = threading.Thread(target=reprocess_thread_func, daemon=True)
         thread.start()
 
+    def _run_retention_policy_loop(self):
+        """Periodically checks for and deletes old meeting audio files based on retention policy."""
+        while not self.retention_policy_stop_event.is_set():
+            # Wait for one hour, but check for the stop event more frequently
+            # so the app can shut down quickly.
+            if self.retention_policy_stop_event.wait(3600): # wait for 1 hour
+                break # Stop event was set
+            
+            self._enforce_retention_policy()
+
+    def _enforce_retention_policy(self):
+        """Deletes meeting audio recordings older than the configured number of days."""
+        if self.delete_after_days <= 0:
+            return  # Policy is disabled
+
+        print(f"Running retention policy check: Deleting audio for meetings older than {self.delete_after_days} days.")
+        now = datetime.now()
+        retention_delta = timedelta(days=self.delete_after_days)
+        
+        try:
+            for item_name in os.listdir("."):
+                if item_name.startswith("meeting-"):
+                    item_path = os.path.join(".", item_name)
+                    if os.path.isdir(item_path):
+                        try:
+                            date_str_full = item_name[len("meeting-"):]
+                            folder_datetime = datetime.strptime(date_str_full, "%Y-%m-%d-%H-%M-%S")
+                            
+                            if now - folder_datetime > retention_delta:
+                                audio_filename = f"meeting-{date_str_full}-mixed.mp3"
+                                audio_filepath = os.path.join(item_path, audio_filename)
+                                
+                                if os.path.exists(audio_filepath):
+                                    print(f"Retention policy: Deleting old audio recording: {audio_filepath}")
+                                    os.remove(audio_filepath)
+                                
+                        except ValueError:
+                            # Ignore folders with malformed names
+                            print(f"Retention policy: Could not parse date from folder name: {item_name}")
+                            continue
+                        except Exception as e:
+                            print(f"Retention policy: Error processing folder {item_path}: {e}")
+        except Exception as e:
+            print(f"Retention policy: Error while listing directories: {e}")
+
     # ==================== Event Handlers ====================
     
+    def _on_retention_days_changed(self, widget):
+        """Handle retention days changes."""
+        self.delete_after_days = int(widget.get_value())
+        settings = load_user_settings()
+        settings['delete_after_days'] = self.delete_after_days
+        save_user_settings(settings)
+        print(f"Retention policy set to: {self.delete_after_days} days (0 means disabled)")
+
     def _on_screenshot_disabled_toggled(self, widget):
         """Handle toggling screenshot disabled state."""
         try:
@@ -1916,6 +1995,7 @@ class Application:
     def quit_action(self, icon, item):
         """Handle application quit."""
         print("\n👋 Beendigung eingeleitet...")
+        self.retention_policy_stop_event.set() # Signal the retention thread to stop
         if self.is_recording:
             self._stop_file_recording()
         
@@ -1943,6 +2023,10 @@ class Application:
     def run(self):
         """Start the application."""
         print("DEBUG: Application run() started.")
+
+        # Start the hourly retention policy check
+        self.retention_policy_thread = threading.Thread(target=self._run_retention_policy_loop, daemon=True)
+        self.retention_policy_thread.start()
 
         # --- Load AI Models ---
         try:
