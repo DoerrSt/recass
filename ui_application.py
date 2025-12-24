@@ -1833,6 +1833,64 @@ class Application:
             else:
                 short_docs.append(d)
         return short_docs
+
+    def _keyword_search_in_meetings(self, query, n_results=3):
+        """Perform a keyword search across all meeting transcripts."""
+        print(f"Performing keyword search for: '{query}'")
+        results = []
+        try:
+            # Use search_file_content to find matches in all meeting transcripts
+            # The tool automatically handles recursion and file matching.
+            search_results = search_file_content(
+                pattern=query,
+                include="meeting-*/*.txt",
+                context=2 # Get 2 lines of context around the match
+            )
+            
+            # Process the raw output into a list of context snippets
+            seen_snippets = set()
+            for result in search_results:
+                # The output format provides a list of lines for each match
+                snippet = "\n".join(result['lines'])
+                if snippet not in seen_snippets:
+                    # Add context header
+                    context_header = f"Keyword match from: {result['file_path']}"
+                    full_snippet = f"{context_header}\n---\n{snippet}"
+                    results.append(full_snippet)
+                    seen_snippets.add(snippet)
+                if len(results) >= n_results:
+                    break
+        except Exception as e:
+            print(f"Error during keyword search: {e}")
+            
+        return results
+
+    def _get_hybrid_context(self, query_text, n_results=5):
+        """
+        Combines semantic (ChromaDB) and keyword (grep) search results.
+        """
+        # 1. Get semantic results
+        semantic_docs = self._get_chroma_context(query_text, n_results=n_results)
+        
+        # 2. Get keyword results
+        keyword_docs = self._keyword_search_in_meetings(query_text, n_results=n_results)
+        
+        # 3. Combine and de-duplicate
+        combined_docs = []
+        seen_docs = set()
+
+        for doc in semantic_docs:
+            if doc not in seen_docs:
+                combined_docs.append(f"Context from Semantic Search:\n{doc}")
+                seen_docs.add(doc)
+        
+        for doc in keyword_docs:
+            if doc not in seen_docs:
+                combined_docs.append(f"Context from Keyword Search:\n{doc}")
+                seen_docs.add(doc)
+                
+        print(f"Hybrid search found {len(combined_docs)} unique context documents.")
+        return combined_docs
     
     def _process_uploaded_file(self, filepath):
         """Read a file, extract text content based on its type, and add it to the ChromaDB collection."""

@@ -338,12 +338,17 @@ Desired Output Format:
         if not self._check_model_available():
             return {'success': False, 'error': f'Model {self.model} is not available'}
 
-        # Build a lightweight prompt that includes context docs if available
-        prompt_parts = []
+        # Build a prompt that encourages using both context and general knowledge
+        prompt_parts = [
+            "You are a helpful assistant. Answer the user's question based on your general knowledge "
+            "and the provided context documents. If the context is relevant, use it to inform your answer, "
+            "but do not limit your response to only the information in the context."
+        ]
         if context_docs:
-            prompt_parts.append("Context documents:\n" + "\n---\n".join(context_docs))
+            context_str = "\n---\n".join(context_docs)
+            prompt_parts.append(f"Here is some context that might be relevant:\n{context_str}")
 
-        prompt_parts.append("User: " + user_message)
+        prompt_parts.append(f"User's question: {user_message}")
         prompt = "\n\n".join(prompt_parts)
 
         try:

@@ -20,6 +20,7 @@
 *   **Meeting & Chat Browser**: Easily browse through past meeting records and chat sessions.
 *   **Retention Policy**: Automatically deletes audio recordings older than a configurable number of days (0 means disabled), helping to manage disk space and data privacy.
 *   **Transcript repurposing**: Generate executive summary, blog post, technical log, ... from the meeting transcript.
+*   **Chat**: Chat with your meeting minutes, it's answering your questions with what has been said.
 
 ## 🚀 Installation
 

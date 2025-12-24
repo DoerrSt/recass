@@ -156,8 +156,8 @@ class ChatWindow:
         except Exception:
             pass
         
-        # Retrieve context from ChromaDB
-        context_docs = self.app._get_chroma_context(text, n_results=3)
+        # Retrieve context using hybrid search
+        context_docs = self.app._get_hybrid_context(text, n_results=3)
         
         # Run Ollama query in background
         def worker(msg, ctx, session_id):
