@@ -844,6 +844,21 @@ class Application:
         thread = threading.Thread(target=reprocess_thread_func, daemon=True)
         thread.start()
 
+    def repurpose_meeting_content(self, full_text, template, callback):
+        """
+        Calls the Ollama analyzer to repurpose content and triggers a callback with the result.
+        This method is designed to be called from a background thread.
+        """
+        analyzer = self._get_ollama_analyzer()
+        result = analyzer.repurpose_content(full_text, template)
+        
+        if result['success']:
+            callback(result['response'])
+        else:
+            error_message = f"Error during content repurposing: {result.get('error', 'Unknown error')}"
+            print(error_message)
+            callback(error_message)
+
     def _run_retention_policy_loop(self):
         """Periodically checks for and deletes old meeting audio files based on retention policy."""
         while not self.retention_policy_stop_event.is_set():

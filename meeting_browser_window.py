@@ -24,6 +24,9 @@ class MeetingBrowserWindow:
         self.current_samplerate = None
         self.playback_position = 0
         self.current_meeting_folder = None
+        self.current_meeting_data = None
+        self.repurpose_output_view = None
+        self.repurpose_combo = None
 
 
     def create_or_show(self):
@@ -274,6 +277,40 @@ class MeetingBrowserWindow:
         media_expander.add(media_content_box)
         protocol_vbox.pack_start(media_expander, False, False, 0)
 
+        # Content Repurposing Section
+        repurpose_expander = Gtk.Expander.new("Content Repurposing")
+        repurpose_content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+
+        repurpose_controls_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        
+        self.repurpose_combo = Gtk.ComboBoxText()
+        self.repurpose_combo.append_text("Executive Summary")
+        self.repurpose_combo.append_text("Technical Log")
+        self.repurpose_combo.append_text("Blog Post Draft")
+        self.repurpose_combo.set_active(0)
+        repurpose_controls_box.pack_start(self.repurpose_combo, True, True, 0)
+
+        self.repurpose_generate_button = Gtk.Button(label="Generate")
+        self.repurpose_generate_button.connect("clicked", self._on_repurpose_generate_clicked)
+        repurpose_controls_box.pack_start(self.repurpose_generate_button, False, False, 0)
+        
+        repurpose_content_box.pack_start(repurpose_controls_box, False, False, 0)
+
+        repurpose_scrolled_window = Gtk.ScrolledWindow()
+        repurpose_scrolled_window.set_hexpand(True)
+        repurpose_scrolled_window.set_vexpand(True)
+        repurpose_scrolled_window.set_min_content_height(200)
+
+        self.repurpose_output_view = Gtk.TextView()
+        self.repurpose_output_view.set_editable(True) # Allow user to copy/edit
+        self.repurpose_output_view.set_cursor_visible(True)
+        self.repurpose_output_view.set_wrap_mode(Gtk.WrapMode.WORD)
+        repurpose_scrolled_window.add(self.repurpose_output_view)
+        repurpose_content_box.pack_start(repurpose_scrolled_window, True, True, 0)
+
+        repurpose_expander.add(repurpose_content_box)
+        protocol_vbox.pack_start(repurpose_expander, True, True, 0)
+
         return protocol_vbox
 
     def _load_meetings(self, meetings=None):
@@ -337,10 +374,15 @@ class MeetingBrowserWindow:
         self.meeting_list_box.add(row)
 
     def _show_meeting_protocol(self, widget, meeting):
+        self.current_meeting_data = meeting
         self.current_meeting_folder = meeting['folder_name']
         self.protocol_title_label.set_label(f"<big><b>{meeting['title'] if meeting['title'] else meeting['folder_name']}</b></big>")
         self.breadcrumb_label.set_label(f"Home > Meeting Protocols > {meeting['title'] if meeting['title'] else meeting['folder_name']}")
         
+        # Clear previous repurposing output
+        if self.repurpose_output_view:
+            self.repurpose_output_view.get_buffer().set_text("")
+
         attendees_text = meeting['attendees'] if meeting['attendees'] else "N/A"
         self.attendees_label.set_label(f"Attendees: {attendees_text}")
         
@@ -405,6 +447,37 @@ class MeetingBrowserWindow:
             if meeting:
                 self._show_meeting_protocol(None, meeting)
         GLib.idle_add(re_enable_button)
+
+    def _on_repurpose_generate_clicked(self, widget):
+        if not self.current_meeting_data:
+            return
+
+        template = self.repurpose_combo.get_active_text()
+        if not template:
+            return
+            
+        transcript = self.current_meeting_data.get('transcript', '')
+        analysis = self.current_meeting_data.get('analysis', '')
+        full_text = f"--- Transcript ---\n{transcript}\n\n--- Analysis ---\n{analysis}"
+
+        self.repurpose_generate_button.set_sensitive(False)
+        self.repurpose_output_view.get_buffer().set_text(f"Generating '{template}'...")
+
+        # This should call a method in the main app to handle the logic in a thread
+        # The method in `app` will then call the callback `_on_repurpose_finished`
+        thread = threading.Thread(
+            target=self.app.repurpose_meeting_content,
+            args=(full_text, template, self._on_repurpose_finished),
+            daemon=True
+        )
+        thread.start()
+
+    def _on_repurpose_finished(self, generated_text):
+        def update_ui():
+            self.repurpose_output_view.get_buffer().set_text(generated_text)
+            self.repurpose_generate_button.set_sensitive(True)
+        GLib.idle_add(update_ui)
+
 
 
     def _on_screenshot_clicked(self, widget, filepath):

@@ -569,3 +569,57 @@ IMPORTANT: Your response should be in the same language as CURRENT MEETING HISTO
         except Exception as e:
             print(f"Error communicating with Ollama for title suggestion: {e}")
             return ""
+
+    def repurpose_content(self, text, template):
+        """
+        Repurposes meeting content into a different format using a template.
+
+        Args:
+            text (str): The full text of the meeting (transcript + analysis).
+            template (str): The name of the template to use (e.g., "Executive Summary").
+
+        Returns:
+            dict: with keys 'success' and 'response' or 'error'.
+        """
+        if not text or not text.strip():
+            return {'success': False, 'error': 'Content to repurpose is empty'}
+
+        if not self._check_connection() or not self._check_model_available():
+            return {'success': False, 'error': 'Ollama connection or model not available'}
+
+        PROMPTS = {
+            "Executive Summary": "You are a senior business analyst. From the provided meeting minutes, generate a concise, high-level executive summary suitable for a C-level audience. Focus on key decisions, strategic outcomes, and major action items. Omit granular details.",
+            "Technical Log": "You are a lead software engineer. From the provided meeting minutes, generate a detailed technical log. Extract all technical decisions, code-related discussions, API changes, architecture proposals, and specific developer action items. Format the output clearly with sections.",
+            "Blog Post Draft": "You are a content marketer. From the provided brainstorming meeting, create a structured blog post draft. Use markdown for formatting. Include a catchy title, a brief introduction, several paragraphs expanding on the main ideas, and a concluding paragraph. The tone should be engaging and informative for a public audience."
+        }
+
+        base_prompt = PROMPTS.get(template)
+        if not base_prompt:
+            return {'success': False, 'error': f"Unknown template: {template}"}
+
+        full_prompt = f"{base_prompt}\n\nHere are the meeting minutes to work from:\n\n---\n\n{text}"
+
+        try:
+            print(f"Repurposing content for template: '{template}'...")
+            response = requests.post(
+                self.endpoint,
+                json={
+                    "model": self.model,
+                    "prompt": full_prompt,
+                    "stream": False,
+                    "temperature": 0.5,
+                },
+                timeout=300, # 5 minute timeout
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                content = result.get("response", "").strip()
+                if content:
+                    return {'success': True, 'response': content}
+                else:
+                    return {'success': False, 'error': 'Empty response from Ollama'}
+            else:
+                return {'success': False, 'error': f'Ollama API returned status {response.status_code}: {response.text}'}
+        except Exception as e:
+            return {'success': False, 'error': f'Error communicating with Ollama: {str(e)}'}

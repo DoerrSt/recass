@@ -16,8 +16,10 @@
 *   **Rolling Transcription History**: Efficiently maintains a buffer of the last 5 minutes of transcription for quick contextual queries and suggestions.
 *   **Joplin Integration**: Seamlessly syncs meeting analysis, including consistency check notes, to your Joplin note-taking application.
 *   **Local AI/LLM Support**: Utilizes local installations of Whisper, Pyannote, and Ollama, ensuring data privacy and offline functionality.
-*   **Configurable Settings**: Customize audio devices, transcription language, screenshot intervals, AI models, and Joplin synchronization settings via a user-friendly GTK UI.
+*   **Configurable Settings**: Customize audio devices, transcription language, screenshot intervals, AI models, retention policy, and Joplin synchronization settings via a user-friendly GTK UI.
 *   **Meeting & Chat Browser**: Easily browse through past meeting records and chat sessions.
+*   **Retention Policy**: Automatically deletes audio recordings older than a configurable number of days (0 means disabled), helping to manage disk space and data privacy.
+*   **Transcript repurposing**: Generate executive summary, blog post, technical log, ... from the meeting transcript.
 
 ## 🚀 Installation
 
